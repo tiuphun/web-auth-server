@@ -39,17 +39,21 @@ app.post("/login", (req, res) => {
     res.json({accessToken, refreshToken});
 })
 
-app.post("/authenticate", (req, res) => {
+app.post("/verify", (req, res) => {
+    if(!req.headers.authorization) {
+        return res.sendStatus(403);
+    }
+
     const token = req.headers.authorization.split(' ')[1];
     
     jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, user) => {
-    
+        console.log(user);
         if(err) {
-            res.json({err: "Nope!"});
+            res.json(err);
         } else {
             res.json({
                 user: {
-                    name: user.name
+                    name: user.user
                 }
             })
         }
