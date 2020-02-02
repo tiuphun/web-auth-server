@@ -3,8 +3,18 @@ require('dotenv').config();
 const express = require('express');
 const app = express();
 const jwt = require("jsonwebtoken");
+const passport = require("passport");
+const { User } = require("./user");
 
 app.use(express.json());
+app.use(passport.initialize());
+// seed user
+User.deleteMany({}, () => {
+    const seed_user = new User({ username: 'duc0905' });
+    seed_user.setPassword('abcd1234')
+        .then(() => seed_user.save())
+        .catch((err) => console.log(err));
+});
 
 let refreshTokens = [];
 
@@ -29,7 +39,8 @@ app.post("/token", (req, res) => {
     });
 })
 
-app.post("/login", (req, res) => {
+app.post("/login", passport.authenticate('local'), (req, res) => {
+    console.log(req.body);
     const username = req.body.username;
     const user = {name: username}
 
@@ -37,27 +48,6 @@ app.post("/login", (req, res) => {
     const refreshToken = jwt.sign(user, process.env.REFRESH_TOKEN_SECRET);
     refreshTokens.push(refreshToken);
     res.json({accessToken, refreshToken});
-})
-
-app.post("/verify", (req, res) => {
-    if(!req.headers.authorization) {
-        return res.sendStatus(403);
-    }
-
-    const token = req.headers.authorization.split(' ')[1];
-    
-    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, user) => {
-        console.log(user);
-        if(err) {
-            res.json(err);
-        } else {
-            res.json({
-                user: {
-                    name: user.user
-                }
-            })
-        }
-    })
 })
 
 app.delete("/logout", (req, res) => {
@@ -70,6 +60,27 @@ app.delete("/logout", (req, res) => {
 function generateAccessToken(user) {
     return jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {expiresIn: '15m'});
 }
+
+function verify(req, res, next) {
+    if (!req.headers.authorization) {
+        return res.sendStatus(403);
+    }
+
+    const token = req.headers.authorization.split(' ')[1];
+
+    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, user) => {
+        console.log(user);
+        if (err) {
+            res.json(err);
+        } else {
+            req.user = {
+                name: user.user
+            }
+            next();
+        }
+    })
+}
+
 
 app.listen(4000, (err) => {
     console.log(`Server is running on port 4000`);
